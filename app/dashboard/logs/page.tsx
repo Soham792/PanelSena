@@ -1,108 +1,45 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Download } from "lucide-react"
+import { Search, Download, AlertCircle, CheckCircle, Info, AlertTriangle } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { useActivities } from "@/hooks/use-activities"
+import { ProtectedRoute } from "@/components/protected-route"
 
-interface LogEntry {
-  id: string
-  timestamp: string
-  type: "info" | "warning" | "error" | "success"
-  action: string
-  description: string
-  user: string
-  display?: string
-}
+type LogType = "all" | "info" | "warning" | "error" | "success"
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<LogEntry[]>([])
+  const { user } = useAuth()
+  const { activities, loading } = useActivities(user?.uid, 100)
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState<"all" | "info" | "warning" | "error" | "success">("all")
+  const [filterType, setFilterType] = useState<LogType>("all")
 
-  useEffect(() => {
-    // Mock logs data
-    const mockLogs: LogEntry[] = [
-      {
-        id: "1",
-        timestamp: new Date(Date.now() - 5 * 60000).toISOString(),
-        type: "success",
-        action: "Display Updated",
-        description: "Display 'Main Hall' brightness set to 80%",
-        user: "john@example.com",
-        display: "Main Hall",
-      },
-      {
-        id: "2",
-        timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
-        type: "info",
-        action: "Content Scheduled",
-        description: "New content scheduled for 'Lobby Display' at 2:00 PM",
-        user: "sarah@example.com",
-        display: "Lobby Display",
-      },
-      {
-        id: "3",
-        timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
-        type: "warning",
-        action: "Low Battery",
-        description: "Display 'Entrance' battery level at 15%",
-        user: "system",
-        display: "Entrance",
-      },
-      {
-        id: "4",
-        timestamp: new Date(Date.now() - 1 * 3600000).toISOString(),
-        type: "error",
-        action: "Connection Lost",
-        description: "Lost connection to display 'Conference Room'",
-        user: "system",
-        display: "Conference Room",
-      },
-      {
-        id: "5",
-        timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
-        type: "success",
-        action: "Content Uploaded",
-        description: "New promotional video uploaded successfully",
-        user: "admin@example.com",
-      },
-      {
-        id: "6",
-        timestamp: new Date(Date.now() - 3 * 3600000).toISOString(),
-        type: "info",
-        action: "User Login",
-        description: "User logged in from 192.168.1.100",
-        user: "john@example.com",
-      },
-      {
-        id: "7",
-        timestamp: new Date(Date.now() - 4 * 3600000).toISOString(),
-        type: "success",
-        action: "Schedule Executed",
-        description: "Morning schedule executed on all displays",
-        user: "system",
-      },
-      {
-        id: "8",
-        timestamp: new Date(Date.now() - 5 * 3600000).toISOString(),
-        type: "warning",
-        action: "High Temperature",
-        description: "Display 'Outdoor' temperature exceeds safe limit",
-        user: "system",
-        display: "Outdoor",
-      },
-    ]
-    setLogs(mockLogs)
-  }, [])
+  // Map activity type to log type
+  const getLogType = (activityType: string): "info" | "warning" | "error" | "success" => {
+    // Check action/description for keywords to determine severity
+    const activityText = `${activityType}`.toLowerCase()
+    
+    if (activityText.includes('error') || activityText.includes('failed') || activityText.includes('delete')) {
+      return 'error'
+    }
+    if (activityText.includes('warning') || activityText.includes('offline')) {
+      return 'warning'
+    }
+    if (activityText.includes('success') || activityText.includes('created') || activityText.includes('uploaded') || activityText.includes('linked')) {
+      return 'success'
+    }
+    return 'info'
+  }
 
-  const filteredLogs = logs.filter((log) => {
+  const filteredLogs = activities.filter((activity) => {
+    const logType = getLogType(activity.action + activity.description)
     const matchesSearch =
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.user.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesFilter = filterType === "all" || log.type === filterType
+      activity.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesFilter = filterType === "all" || logType === filterType
     return matchesSearch && matchesFilter
   })
 
@@ -121,7 +58,7 @@ export default function LogsPage() {
     }
   }
 
-  const formatTime = (timestamp: string) => {
+  const formatTime = (timestamp: Date) => {
     const date = new Date(timestamp)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
@@ -136,17 +73,41 @@ export default function LogsPage() {
     return date.toLocaleDateString()
   }
 
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-red-500" />
+      case "warning":
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
+      case "success":
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      default:
+        return <Info className="h-4 w-4 text-blue-500" />
+    }
+  }
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(filteredLogs, null, 2)
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
+    const exportFileDefaultName = `logs_${new Date().toISOString().split('T')[0]}.json`
+    const linkElement = document.createElement('a')
+    linkElement.setAttribute('href', dataUri)
+    linkElement.setAttribute('download', exportFileDefaultName)
+    linkElement.click()
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <ProtectedRoute>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Activity Logs</h1>
-          <p className="text-muted-foreground">Monitor all system activities and events</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Activity Logs</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Monitor all system activities and events</p>
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
             <Input
@@ -156,39 +117,42 @@ export default function LogsPage() {
               className="pl-10 bg-card/50 backdrop-blur-sm border-border/50"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto">
             <Button
               variant={filterType === "all" ? "default" : "outline"}
               onClick={() => setFilterType("all")}
-              className="bg-card/50 backdrop-blur-sm border-border/50"
+              className="bg-card/50 backdrop-blur-sm border-border/50 whitespace-nowrap"
             >
               All
             </Button>
             <Button
               variant={filterType === "success" ? "default" : "outline"}
               onClick={() => setFilterType("success")}
-              className="bg-card/50 backdrop-blur-sm border-border/50"
+              className="bg-card/50 backdrop-blur-sm border-border/50 whitespace-nowrap"
             >
               Success
             </Button>
             <Button
               variant={filterType === "warning" ? "default" : "outline"}
               onClick={() => setFilterType("warning")}
-              className="bg-card/50 backdrop-blur-sm border-border/50"
+              className="bg-card/50 backdrop-blur-sm border-border/50 whitespace-nowrap"
             >
               Warning
             </Button>
             <Button
               variant={filterType === "error" ? "default" : "outline"}
               onClick={() => setFilterType("error")}
-              className="bg-card/50 backdrop-blur-sm border-border/50"
+              className="bg-card/50 backdrop-blur-sm border-border/50 whitespace-nowrap"
             >
               Error
             </Button>
           </div>
-          <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground">
+          <Button 
+            onClick={handleExport}
+            className="bg-linear-to-r from-primary to-accent hover:opacity-90 text-primary-foreground whitespace-nowrap"
+          >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </Button>
         </div>
 
@@ -197,35 +161,47 @@ export default function LogsPage() {
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>
-              Showing {filteredLogs.length} of {logs.length} logs
+              Showing {filteredLogs.length} of {activities.length} logs
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {filteredLogs.length > 0 ? (
-                filteredLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-start gap-4 p-4 rounded-lg border border-border/30 hover:border-border/60 transition-colors bg-background/30 hover:bg-background/50"
-                  >
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${getTypeColor(log.type)}`}>
-                      {log.type.toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-foreground">{log.action}</h3>
-                        {log.display && (
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">{log.display}</span>
-                        )}
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading logs...</p>
+                </div>
+              ) : filteredLogs.length > 0 ? (
+                filteredLogs.map((activity) => {
+                  const logType = getLogType(activity.action + activity.description)
+                  return (
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-4 p-4 rounded-lg border border-border/30 hover:border-border/60 transition-colors bg-background/30 hover:bg-background/50"
+                    >
+                      <div className="flex items-center gap-2">
+                        {getTypeIcon(logType)}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{log.description}</p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>By: {log.user}</span>
-                        <span>{formatTime(log.timestamp)}</span>
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${getTypeColor(logType)}`}>
+                        {logType.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-foreground">{activity.action}</h3>
+                          {activity.metadata?.displayName && (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              {activity.metadata.displayName}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">{activity.description}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="capitalize">{activity.type} Activity</span>
+                          <span>{formatTime(new Date(activity.timestamp))}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No logs found matching your criteria</p>
@@ -236,5 +212,6 @@ export default function LogsPage() {
         </Card>
       </div>
     </div>
+    </ProtectedRoute>
   )
 }

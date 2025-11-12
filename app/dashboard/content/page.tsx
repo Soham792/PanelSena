@@ -1,106 +1,82 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardHeader } from "@/components/dashboard-header"
 import { ContentLibrary } from "@/components/content-library"
 import { ContentUpload } from "@/components/content-upload"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImageIcon, VideoIcon, FileTextIcon } from "lucide-react"
-
-interface ContentItem {
-  id: number
-  name: string
-  type: "image" | "video" | "document"
-  size: string
-  uploadDate: string
-  category: string
-  thumbnail?: string
-}
+import { useAuth } from "@/hooks/use-auth"
+import { useContent } from "@/hooks/use-content"
+import { useDisplays } from "@/hooks/use-displays"
+import { ContentItem } from "@/lib/types"
+import { sendPlaybackCommand } from "@/lib/realtime-db"
 
 export default function ContentPage() {
-  const [contentItems, setContentItems] = useState<ContentItem[]>([
-    {
-      id: 1,
-      name: "Welcome Banner.jpg",
-      type: "image",
-      size: "2.4 MB",
-      uploadDate: "2 days ago",
-      category: "Marketing",
-      thumbnail: "/welcome-banner.png",
-    },
-    {
-      id: 2,
-      name: "Product Demo.mp4",
-      type: "video",
-      size: "45.2 MB",
-      uploadDate: "1 week ago",
-      category: "Promotions",
-      thumbnail: "/product-demo-video.png",
-    },
-    {
-      id: 3,
-      name: "Company Info.pdf",
-      type: "document",
-      size: "1.8 MB",
-      uploadDate: "3 days ago",
-      category: "Information",
-    },
-    {
-      id: 4,
-      name: "Event Poster.jpg",
-      type: "image",
-      size: "3.1 MB",
-      uploadDate: "5 days ago",
-      category: "Events",
-      thumbnail: "/event-poster.png",
-    },
-    {
-      id: 5,
-      name: "Announcement.mp4",
-      type: "video",
-      size: "28.5 MB",
-      uploadDate: "1 week ago",
-      category: "Announcements",
-      thumbnail: "/announcement-video.jpg",
-    },
-    {
-      id: 6,
-      name: "Menu Board.jpg",
-      type: "image",
-      size: "1.9 MB",
-      uploadDate: "4 days ago",
-      category: "Menus",
-      thumbnail: "/menu-board.jpg",
-    },
-  ])
-
+  const { user } = useAuth()
+  const { content, loading, uploadContent, editContent, removeContent, uploadProgress } = useContent(user?.uid)
+  const { displays } = useDisplays(user?.uid)
   const [activeTab, setActiveTab] = useState("library")
 
-  const handleUpload = (newContent: ContentItem) => {
-    setContentItems([...contentItems, newContent])
+  const handleUpload = async (file: File, category: string, type: 'image' | 'video' | 'document') => {
+    try {
+      await uploadContent(file, category, type)
+      setActiveTab("library")
+    } catch (error) {
+      console.error("Upload failed:", error)
+    }
   }
 
-  const handleDelete = (id: number) => {
-    setContentItems(contentItems.filter((item) => item.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      await removeContent(id)
+    } catch (error) {
+      console.error("Delete failed:", error)
+    }
   }
 
-  const user = { email: "user@example.com", companyName: "My Company" }
+  const handlePlayNow = async (contentId: string, displayId: string) => {
+    if (!user) return
+    
+    try {
+      const contentItem = content.find(c => c.id === contentId)
+      if (!contentItem) return
 
-  const imageCount = contentItems.filter((item) => item.type === "image").length
-  const videoCount = contentItems.filter((item) => item.type === "video").length
-  const documentCount = contentItems.filter((item) => item.type === "document").length
+      await sendPlaybackCommand(user.uid, displayId, {
+        type: 'play',
+        displayId,
+        payload: {
+          contentId: contentItem.id,
+        }
+      })
+      
+      alert(`Playing "${contentItem.name}" on display`)
+    } catch (error) {
+      console.error("Play now failed:", error)
+      alert('Failed to send play command')
+    }
+  }
+
+  const imageCount = content.filter((item) => item.type === "image").length
+  const videoCount = content.filter((item) => item.type === "video").length
+  const documentCount = content.filter((item) => item.type === "document").length
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading content...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader user={user} />
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Content Management</h1>
-          <p className="text-muted-foreground mt-1">Upload and organize content for your displays</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Content Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Upload and organize content for your displays</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-500/10 rounded-lg">
@@ -145,7 +121,12 @@ export default function ContentPage() {
           </TabsList>
 
           <TabsContent value="library" className="mt-6">
-            <ContentLibrary items={contentItems} onDelete={handleDelete} />
+            <ContentLibrary 
+              items={content} 
+              onDelete={handleDelete}
+              displays={displays}
+              onPlayNow={handlePlayNow}
+            />
           </TabsContent>
 
           <TabsContent value="upload" className="mt-6">

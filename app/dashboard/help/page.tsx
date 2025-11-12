@@ -4,7 +4,8 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChevronDown, Search, Mail, MessageSquare, BookOpen } from "lucide-react"
+import { ChevronDown, Search, Mail, MessageSquare, BookOpen, Info } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface FAQItem {
   id: string
@@ -26,7 +27,7 @@ const faqs: FAQItem[] = [
     category: "Getting Started",
     question: "What are the system requirements?",
     answer:
-      "SmartDisplay requires a Raspberry Pi 3 or higher with at least 1GB RAM. You'll also need a stable internet connection and a compatible display (HDMI or similar). The system supports most modern digital displays and signage.",
+      "PanelSena requires a Raspberry Pi 3 or higher with at least 1GB RAM. You'll also need a stable internet connection and a compatible display (HDMI or similar). The system supports most modern digital displays and signage.",
   },
   {
     id: "3",
@@ -47,7 +48,7 @@ const faqs: FAQItem[] = [
     category: "Troubleshooting",
     question: "Why is my display showing offline?",
     answer:
-      "Check that your Raspberry Pi has a stable internet connection. Verify the device is powered on and the SmartDisplay service is running. You can restart the service from the display controls panel.",
+      "Check that your Raspberry Pi has a stable internet connection. Verify the device is powered on and the PanelSena service is running. You can restart the service from the display controls panel.",
   },
   {
     id: "6",
@@ -75,6 +76,7 @@ const faqs: FAQItem[] = [
 const categories = ["All", ...new Set(faqs.map((faq) => faq.category))]
 
 export default function HelpPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -88,15 +90,31 @@ export default function HelpPage() {
   })
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Help & Support</h1>
-        <p className="text-muted-foreground mt-1">Find answers and get support for SmartDisplay</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Help & Support</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1">Find answers and get support for PanelSena</p>
       </div>
 
       {/* Support Options */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card 
+          className="border-border/50 hover:border-border transition-colors cursor-pointer"
+          onClick={() => router.push('/dashboard/about')}
+        >
+          <CardContent className="pt-6 text-center space-y-3">
+            <div className="flex justify-center">
+              <Info className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="font-semibold text-foreground">About</h3>
+            <p className="text-sm text-muted-foreground">Learn more about PanelSena</p>
+            <Button variant="outline" className="w-full border-border bg-transparent">
+              View About
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card className="border-border/50 hover:border-border transition-colors cursor-pointer">
           <CardContent className="pt-6 text-center space-y-3">
             <div className="flex justify-center">
@@ -216,7 +234,7 @@ export default function HelpPage() {
           <div className="flex items-center justify-between p-3 hover:bg-accent/50 rounded-lg transition-colors cursor-pointer">
             <div>
               <p className="font-medium text-foreground">API Documentation</p>
-              <p className="text-sm text-muted-foreground">Integrate SmartDisplay with your systems</p>
+              <p className="text-sm text-muted-foreground">Integrate PanelSena with your systems</p>
             </div>
             <Button variant="ghost" size="sm" className="text-primary">
               View
@@ -234,7 +252,7 @@ export default function HelpPage() {
           <div className="flex items-center justify-between p-3 hover:bg-accent/50 rounded-lg transition-colors cursor-pointer">
             <div>
               <p className="font-medium text-foreground">Community Forum</p>
-              <p className="text-sm text-muted-foreground">Connect with other SmartDisplay users</p>
+              <p className="text-sm text-muted-foreground">Connect with other PanelSena users</p>
             </div>
             <Button variant="ghost" size="sm" className="text-primary">
               Join
